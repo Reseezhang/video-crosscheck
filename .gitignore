@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 运行产物
+out/
+crosscheck_out/
+frames/
+ocr_frames.json
+crosscheck_report.md
+*.m4s
+*.mp4
+
+# 系统
+.DS_Store
+Thumbs.db
