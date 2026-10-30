@@ -15,6 +15,8 @@ import vx
 def main() -> int:
     ap = argparse.ArgumentParser(description="画面 OCR 与配音转写交叉校验")
     ap.add_argument("--video", help="本地视频文件（与 --frames-dir 二选一）")
+    ap.add_argument("--bvid", help="B 站链接或 BV 号，自动取视频流")
+    ap.add_argument("--page", type=int, default=1, help="B 站分 P 序号（默认 1）")
     ap.add_argument("--frames-dir", help="已有抽帧目录（跳过抽帧）")
     ap.add_argument("--transcript", required=True, help="带时间轴的转写稿 markdown")
     ap.add_argument("--outdir", default="crosscheck_out", help="输出目录")
@@ -40,8 +42,16 @@ def main() -> int:
     elif args.video:
         frames_dir = outdir / "frames"
         files = vx.extract_frames(pathlib.Path(args.video), frames_dir, args.interval)
+    elif args.bvid:
+        try:
+            video = vx.fetch_bilibili_video(args.bvid, outdir / "media", args.page)
+        except Exception as exc:
+            print("取流失败：%s" % exc, file=sys.stderr)
+            return 2
+        frames_dir = outdir / "frames"
+        files = vx.extract_frames(video, frames_dir, args.interval)
     else:
-        print("需要 --video 或 --frames-dir", file=sys.stderr)
+        print("需要 --video、--bvid 或 --frames-dir", file=sys.stderr)
         return 2
     print("      帧数：%d" % len(files), flush=True)
 

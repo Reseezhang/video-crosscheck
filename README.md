@@ -27,10 +27,13 @@
 ```bash
 pip install rapidocr-onnxruntime imageio-ffmpeg
 
-# 有视频：抽帧 + OCR + 校验一条龙
+# 从 B 站链接直接跑（自动取流）
+python scripts/run.py --bvid BV1xx411c7mD --transcript transcript.md --outdir out
+
+# 本地视频：抽帧 + OCR + 校验一条龙
 python scripts/run.py --video video.m4s --transcript transcript.md --outdir out
 
-# 已有抽帧目录：跳过抽帧
+# 已有抽帧目录：跳过取流和抽帧
 python scripts/run.py --frames-dir out/frames --transcript transcript.md --outdir out
 ```
 

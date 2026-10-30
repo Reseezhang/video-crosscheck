@@ -12,7 +12,10 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import shutil
 import subprocess
+import urllib.parse
+import urllib.request
 from difflib import SequenceMatcher
 
 PUNCT_RE = re.compile(
@@ -54,6 +57,63 @@ def image_height(path: pathlib.Path) -> int:
             return im.height
     except Exception:
         return 480
+
+
+BILI_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+
+
+def parse_bvid(text: str) -> str | None:
+    """从分享文本 / 链接 / 裸 BV 号里取出 BV 号。"""
+    m = re.search(r"(BV[0-9A-Za-z]{10})", text or "")
+    return m.group(1) if m else None
+
+
+def _bili_json(url: str, params: dict, headers: dict, timeout: int = 20) -> dict:
+    query = urllib.parse.urlencode(params)
+    req = urllib.request.Request(f"{url}?{query}", headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def fetch_bilibili_video(target: str, outdir: pathlib.Path, page: int = 1) -> pathlib.Path:
+    """从 B 站链接/BV 号直接取视频流。
+
+    注意：未登录状态下 B 站只给 480p（`accept_quality` 会列出 1080P，但 dash 里没有）。
+    480p 对 OCR 通常够用，前提是原视频字号够大。
+    """
+    bvid = parse_bvid(target) or target.strip()
+    headers = {"User-Agent": BILI_UA,
+               "Referer": f"https://www.bilibili.com/video/{bvid}/"}
+
+    view = _bili_json("https://api.bilibili.com/x/web-interface/view",
+                      {"bvid": bvid}, headers)
+    if view.get("code") != 0:
+        raise RuntimeError("取视频信息失败：%s" % view.get("message"))
+    data = view["data"]
+    pages = data.get("pages") or [{"cid": data["cid"]}]
+    idx = max(1, min(page, len(pages))) - 1
+    cid = pages[idx]["cid"]
+
+    play = _bili_json("https://api.bilibili.com/x/player/playurl",
+                      {"bvid": bvid, "cid": cid, "fnval": 16, "qn": 127}, headers)
+    if play.get("code") != 0:
+        raise RuntimeError("取播放地址失败：%s" % play.get("message"))
+    videos = (play.get("data") or {}).get("dash", {}).get("video") or []
+    if not videos:
+        raise RuntimeError("没有可用的视频流（可能是付费/会员内容）")
+    best = max(videos, key=lambda v: v.get("width", 0) * v.get("height", 0))
+
+    outdir.mkdir(parents=True, exist_ok=True)
+    out = outdir / ("%s_p%d.m4s" % (bvid, idx + 1))
+    if not out.is_file() or out.stat().st_size < 1024:
+        req = urllib.request.Request(best["baseUrl"], headers=headers)
+        with urllib.request.urlopen(req, timeout=180) as r, open(out, "wb") as f:
+            shutil.copyfileobj(r, f)
+    print("  视频：%s（%dx%d，%.1f MB）"
+          % (out.name, best.get("width", 0), best.get("height", 0),
+             out.stat().st_size / 1048576), flush=True)
+    return out
 
 
 def extract_frames(video: pathlib.Path, outdir: pathlib.Path, interval: int = 2):

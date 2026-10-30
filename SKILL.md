@@ -27,7 +27,7 @@ description: 对文字密集型视频做「画面 OCR + 配音转写」双证据
 ## 前置条件
 
 1. **转写稿**：先用 `video-to-note` 技能拿到带时间轴的 markdown（格式 `[MM:SS-MM:SS] 正文`）
-2. **视频文件**：需要本地视频，不是链接。B 站取流见下
+2. **视频来源**：三选一 —— B 站链接（`--bvid`，自动取流）、本地视频文件（`--video`）、已有抽帧目录（`--frames-dir`）
 3. **依赖**：`rapidocr-onnxruntime`、`Pillow`，以及 ffmpeg（没装则用 `imageio-ffmpeg` 自带的）
 4. **算力预期**：2 秒抽帧，11 分钟视频约 356 帧，**OCR 约 10 分钟**（CPU）
 
@@ -37,7 +37,9 @@ pip install rapidocr-onnxruntime imageio-ffmpeg
 
 ## 取视频流（B 站）
 
-未登录状态下 480p 是可拿的上限；1080P 需要 `SESSDATA`。**480p 对 OCR 已经够用**——只要视频本身字号够大，缩到 480p 依然认得出来。请求必须带 `Referer`，否则 CDN 403：
+**已内置**：传 `--bvid` 即可（接受分享文本、完整链接、`b23.tv` 短链、裸 BV 号）。
+
+未登录状态下 480p 是可拿的上限；1080P 需要 `SESSDATA`。**480p 对 OCR 已经够用**——只要视频本身字号够大，缩到 480p 依然认得出来。若走手工路线，请求必须带 `Referer`，否则 CDN 403：
 
 ```
 x/player/playurl?bvid=<BV>&cid=<CID>&fnval=16&qn=127
@@ -48,10 +50,13 @@ x/player/playurl?bvid=<BV>&cid=<CID>&fnval=16&qn=127
 ## 用法
 
 ```bash
-# 有视频：一步到位
+# 从 B 站链接直接跑（自动取流，最省事）
+python scripts/run.py --bvid BV1xx411c7mD --transcript transcript.md --outdir out
+
+# 本地视频：跳过取流
 python scripts/run.py --video video.m4s --transcript transcript.md --outdir out
 
-# 已有抽帧目录：跳过抽帧
+# 已有抽帧目录：跳过取流和抽帧
 python scripts/run.py --frames-dir out/frames --transcript transcript.md --outdir out
 ```
 
